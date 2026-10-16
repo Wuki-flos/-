@@ -8783,7 +8783,7 @@ video {
       <div class="cover-transition" id="coverTransition">
         <div class="cover-transition__sticky">
           <section class="cover-stage" id="coverStage" aria-labelledby="mainTitle">
-        <p class="cover-browser-tip">建议在电脑端浏览本网页</p>
+        <p class="cover-browser-tip">请在电脑端浏览本网页</p>
         <div class="cover-art" aria-hidden="true">
           <div class="cover-image" role="img" aria-label="田园、青年与农业机器人组成的封面插画"></div>
           <div class="sun-wash"></div>
@@ -8836,7 +8836,7 @@ video {
             <div class="data-narrative__step" data-observe-section>
               <div class="data-narrative__text">
                 <p>
-                  过去<span class="data-value data-value--large">20</span>年，第一产业就业占比持续走低，大量劳动力持续向城镇二三产业转移。但与此同时，<span class="data-value data-value--large">2020</span>至<span class="data-value data-value--large">2025</span>年河南新增返乡创业青年人数整体保持增长态势，<span class="data-value data-value--large">2025</span>年创下阶段峰值。映照出越来越多青年愿意回归乡土从事农业的现实图景。
+                  过去<span class="data-value data-value--large">20</span>年，全国第一产业就业占比持续走低，大量劳动力持续向城镇二三产业转移。但与此同时，<span class="data-value data-value--large">2020</span>至<span class="data-value data-value--large">2025</span>年河南新增返乡创业青年人数整体保持增长态势，<span class="data-value data-value--large">2025</span>年创下阶段峰值。这映照出越来越多青年愿意回归乡土从事农业的现实图景。
                 </p>
               </div>
             </div>
@@ -10664,7 +10664,8 @@ video {
                 <p class="ending-credits__source-detail ending-credits__line"><a class="ending-credits__link" href="https://dzswgf.mofcom.gov.cn/news_attachments/20200414045153320.pdf" target="_blank" rel="noopener noreferrer">商务部《2019 年全国网络零售市场发展报告》</a>；</p>
                 <p class="ending-credits__source-detail ending-credits__line"><a class="ending-credits__link" href="https://www.gov.cn/lianbo/202602/content_7057158.htm" target="_blank" rel="noopener noreferrer">中国政府网 / 新华社《2025 年农村网络零售额首超 3 万亿元》</a>；</p>
                 <p class="ending-credits__source-detail ending-credits__line"><a class="ending-credits__link" href="https://www.mofcom.gov.cn/xwfb/sjfzrfb/art/2025/art_beaa8537592840989b7cc60e4b43825e.html" target="_blank" rel="noopener noreferrer">商务部流通发展司《谈 2024 年我国批发和零售业发展情况》</a></p>
-                <p class="ending-credits__source-detail ending-credits__line">其他数据和案例均来自官方资料</p>
+                <br>
+                <p class="ending-credits__source-detail ending-credits__line">另：其他数据和案例均来自官方资料</p>
               </div>
             </div>
           </section>
@@ -15696,6 +15697,9 @@ let levelFourRoadLocked = false;
 let levelFourRoadEntered = false;
 let levelFourProgress = 0;
 let levelFourProgressFrame = 0;
+/* 第四关人物前进：累积两次下滑（约 2 × 100 的滚轮量）才前进一步，并切换一次人物素材。 */
+const LEVEL_FOUR_STEP_DELTA = 200;
+let levelFourWheelStepAccum = 0;
 let levelFourRoadDistance = 0;
 let levelFourContinueHintTimer = 0;
 let levelFourTouchY = 0;
@@ -15833,6 +15837,7 @@ function levelFourResetRoadJourney() {
   levelFourRoadLocked = false;
   levelFourRoadEntered = false;
   levelFourProgress = 0;
+  levelFourWheelStepAccum = 0;
   window.clearTimeout(levelFourContinueHintTimer);
   levelFourContinueHintTimer = 0;
   levelFourTouchY = 0;
@@ -15864,6 +15869,21 @@ function levelFourToggleWalkFrame() {
     "is-frame-two",
     levelFourWalkFrameTwo,
   );
+}
+
+/*
+ * 一步 = 一次下滑的推进量，但需要两次下滑才走一步：
+ * 每走一步切换一次人物素材，前进量比原来少一半，人物动得更慢。
+ */
+function levelFourAdvanceWalkSteps(steps) {
+  const count = Math.abs(steps);
+  if (!count) return;
+  const direction = steps < 0 ? -1 : 1;
+  const stepProgress = 100 / (levelFourScroll.clientHeight * 2.8);
+  for (let i = 0; i < count; i += 1) {
+    levelFourToggleWalkFrame();
+    levelFourSetProgress(levelFourProgress + direction * stepProgress);
+  }
 }
 
 function levelFourClearLectureTimers() {
@@ -16214,23 +16234,24 @@ function levelFourWheelHandler(event) {
     if (remaining <= 2 && event.deltaY > 0) {
       event.preventDefault();
       levelFourLockRoad();
-      levelFourToggleWalkFrame();
-      levelFourSetProgress(
-        levelFourProgress + event.deltaY / (levelFourScroll.clientHeight * 2.8),
-      );
+      levelFourWheelStepAccum = 0;
+      levelFourAdvanceWalkSteps(1);
     }
     return;
   }
 
   event.preventDefault();
   if (event.deltaY < 0 && levelFourProgress <= 0) {
+    levelFourWheelStepAccum = 0;
     levelFourUnlockRoad({ scrollBack: Math.min(90, Math.abs(event.deltaY)) });
     return;
   }
-  levelFourToggleWalkFrame();
-  levelFourSetProgress(
-    levelFourProgress + event.deltaY / (levelFourScroll.clientHeight * 2.8),
-  );
+  // 累积滚轮量，凑够两次下滑才前进一步。
+  levelFourWheelStepAccum += event.deltaY;
+  const wheelSteps = Math.trunc(levelFourWheelStepAccum / LEVEL_FOUR_STEP_DELTA);
+  if (!wheelSteps) return;
+  levelFourWheelStepAccum -= wheelSteps * LEVEL_FOUR_STEP_DELTA;
+  levelFourAdvanceWalkSteps(wheelSteps);
 }
 
 function levelFourTouchStart(event) {
@@ -17117,6 +17138,8 @@ function endingReset({ preserveSession = false } = {}) {
   }
   if (endingStage) endingStage.scrollTop = 0;
   endingCreditsHoldCount = 0;
+  endingFinalFirstHoldCount = 0;
+  endingFinalGapHoldCount = 0;
   /* 信封层已迁移到开头地图：只在它仍属于结尾舞台时清空。 */
   if (endingStage && endingEnvelopes && endingStage.contains(endingEnvelopes)) {
     endingEnvelopes.replaceChildren();
@@ -18484,6 +18507,11 @@ const ENDING_FINAL_STAGE_PROGRESS = 0.982;
 const ENDING_FINAL_TEXT_DONE = 0.998;
 const ENDING_SCENE_ENTRY_WINDOW = 0.015;
 let endingCreditsHoldCount = 0;
+/* 终章：第一段出现前先停顿 2 次下滑；两段之间再停顿 3 次下滑。 */
+const ENDING_FINAL_FIRST_HOLD_STEPS = 2;
+const ENDING_FINAL_GAP_HOLD_STEPS = 3;
+let endingFinalFirstHoldCount = 0;
+let endingFinalGapHoldCount = 0;
 
 function endingSceneWheelTarget(direction) {
   if (!endingStage || !direction) return null;
@@ -18494,7 +18522,9 @@ function endingSceneWheelTarget(direction) {
   const progress = endingClamp01(rawProgress);
   const firstScene = ENDING_SCENE_LAYOUT[0];
   const lastScene = ENDING_SCENE_LAYOUT[ENDING_SCENE_LAYOUT.length - 1];
-  if (direction > 0 && progress >= ENDING_FINAL_TEXT_DONE) return null;
+  /* 用 0.0005 容差判断“终章最后一段已出完”，否则 100% 缩放时滚动位置会被取整成
+     略小于锚点的值，导致一直吸附在锚点上、无法继续下滑进入数据来源。 */
+  if (direction > 0 && progress >= ENDING_FINAL_TEXT_DONE - 0.0005) return null;
   if (
     direction > 0 &&
     progress >= ENDING_FINAL_STAGE_PROGRESS - 0.0005
@@ -19325,7 +19355,11 @@ function setupEndingCreditsReveal() {
     var direction = event.deltaY < 0 ? -1 : 1;
     var max = Math.max(1, endingCoreMaxScroll());
     var rawProgress = endingStage.scrollTop / max;
-    if (direction < 0) endingCreditsHoldCount = 0;
+    if (direction < 0) {
+      endingCreditsHoldCount = 0;
+      endingFinalFirstHoldCount = 0;
+      endingFinalGapHoldCount = 0;
+    }
     if (
       direction > 0 &&
       rawProgress >= ENDING_FINAL_TEXT_DONE - 0.0005 &&
@@ -19339,6 +19373,33 @@ function setupEndingCreditsReveal() {
 
     var target = endingSceneWheelTarget(direction);
     if (target === null) return;
+
+    // 终章第一段出现前：先停顿两次下滑，再让文字出现。
+    if (
+      direction > 0 &&
+      Math.abs(target - ENDING_FINAL_STAGE_PROGRESS) < 0.0005 &&
+      rawProgress < ENDING_FINAL_STAGE_PROGRESS - 0.0005 &&
+      endingFinalFirstHoldCount < ENDING_FINAL_FIRST_HOLD_STEPS
+    ) {
+      endingFinalFirstHoldCount += 1;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+
+    // 终章两段文字之间：再停顿三次下滑。
+    if (
+      direction > 0 &&
+      Math.abs(target - ENDING_FINAL_TEXT_DONE) < 0.0005 &&
+      rawProgress >= ENDING_FINAL_STAGE_PROGRESS - 0.0005 &&
+      rawProgress < ENDING_FINAL_TEXT_DONE - 0.0005 &&
+      endingFinalGapHoldCount < ENDING_FINAL_GAP_HOLD_STEPS
+    ) {
+      endingFinalGapHoldCount += 1;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
 
     event.preventDefault();
     event.stopImmediatePropagation();
